@@ -14,10 +14,12 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
+import static com.borisenko.transaction.data.TransactionsStatistics.ZERO_STATISTICS;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -52,25 +54,25 @@ public class ApplicationTest {
                 .andReturn().getResponse();
     }
 
-    private void postTransactionRequest(Transaction t1) throws Exception {
-        mvc.perform(post(transactionsControllerPath)
+    private ResultActions postTransactionRequest(Transaction t1) throws Exception {
+        return mvc.perform(post(transactionsControllerPath)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(t1)))
-                .andExpect(status().isCreated());
+                .content(objectMapper.writeValueAsString(t1)));
+
     }
 
     @Test
     public void testNoTransactionsStatistics() throws Exception {
         MockHttpServletResponse response = getStatisticsResponse();
         assertThat(response.getContentAsString())
-                .isEqualTo(objectMapper.writeValueAsString(TransactionsStatistics.ZERO_STATISTICS));
+                .isEqualTo(objectMapper.writeValueAsString(ZERO_STATISTICS));
     }
 
     @Test
     @DirtiesContext
     public void testAddOneTransaction() throws Exception {
         double amount = 239.0;
-        postTransactionRequest(new Transaction(amount, Instant.now().toEpochMilli()));
+        postTransactionRequest(new Transaction(amount, Instant.now().toEpochMilli())).andExpect(status().isCreated());
 
         MockHttpServletResponse response = getStatisticsResponse();
 
@@ -86,8 +88,8 @@ public class ApplicationTest {
         long timestamp1 = Instant.now().toEpochMilli();
         long timestamp2 = timestamp1 + 1;
 
-        postTransactionRequest(new Transaction(amount1, timestamp1));
-        postTransactionRequest(new Transaction(amount2, timestamp2));
+        postTransactionRequest(new Transaction(amount1, timestamp1)).andExpect(status().isCreated());
+        postTransactionRequest(new Transaction(amount2, timestamp2)).andExpect(status().isCreated());
 
         MockHttpServletResponse response = getStatisticsResponse();
 
@@ -109,10 +111,11 @@ public class ApplicationTest {
         double amount = 10.0;
         long timeSlotMillis = TimeUnit.SECONDS.toMillis(transactionsTimeSlotSeconds);
         for (int i = 0; i < 100; i++) {
-            postTransactionRequest(new Transaction(amount, now - timeSlotMillis - i));
+            Transaction transaction = new Transaction(amount, now - timeSlotMillis - i);
+            postTransactionRequest(transaction).andExpect(status().isNoContent());
         }
 
-        assertEquals(objectMapper.writeValueAsString(TransactionsStatistics.ZERO_STATISTICS), getStatisticsResponse().getContentAsString());
+        assertEquals(objectMapper.writeValueAsString(ZERO_STATISTICS), getStatisticsResponse().getContentAsString());
     }
 
     @Test
@@ -123,8 +126,8 @@ public class ApplicationTest {
         long timeSlotMillis = TimeUnit.SECONDS.toMillis(transactionsTimeSlotSeconds);
         long numberOfTransactions = timeSlotMillis / 1000;
 
-        for (int i = 0; i <= numberOfTransactions; i++) {
-            postTransactionRequest(new Transaction(amount, now - i * 1000));
+        for (int i = 0; i < numberOfTransactions; i++) {
+            postTransactionRequest(new Transaction(amount, now - i * 100)).andExpect(status().isCreated());
         }
 
         TransactionsStatistics expectedStatistics = new TransactionsStatistics(
@@ -144,7 +147,8 @@ public class ApplicationTest {
         int numberOfTransactions = 1000;
 
         for (int i = 0; i < numberOfTransactions; i++) {
-            postTransactionRequest(new Transaction(i, now));
+            postTransactionRequest(new Transaction(i, now)).andExpect(status().isCreated());
+            ;
         }
 
         TransactionsStatistics expectedStatistics = new TransactionsStatistics(

@@ -30,13 +30,16 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
-    public void register(Transaction transaction) {
+    public TransactionProcessingResult register(Transaction transaction) {
         long now = Instant.now().toEpochMilli();
         if (areInTimeSlot(now, transaction.getTimestamp())) {
             for (int i = 0; i < timeSlotInMillis; i++) {
                 statistics.compute((transaction.getTimestamp() + i) % numberOfStatsEntries,
                         (idx, value) -> updateStatsHolder(value, transaction));
             }
+            return TransactionProcessingResult.OK;
+        } else {
+            return TransactionProcessingResult.TRANSACTION_IS_TOO_OLD;
         }
     }
 

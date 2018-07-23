@@ -4,7 +4,9 @@ import com.borisenko.transaction.data.Transaction;
 import com.borisenko.transaction.data.TransactionsStatistics;
 
 public interface TransactionService {
-    void register(Transaction transaction);
+    TransactionProcessingResult register(Transaction transaction);
 
     TransactionsStatistics getStatistics();
+
+    enum TransactionProcessingResult {OK, TRANSACTION_IS_TOO_OLD;}
 }
